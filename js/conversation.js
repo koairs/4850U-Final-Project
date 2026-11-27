@@ -15,28 +15,59 @@ function say(text, quickReplies = []) {
 function getMovie() { return MOVIES.find((m) => m.title === booking.movie); }
 function nextEmptySlot() { return SLOTS.find((s) => !booking[s]); }
 
-// ---- Parsers: return a valid value, or null if the text isn't usable ----
-const NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+// ---- Validators: return { ok: true, value } or { ok: false, msg } ----
+const NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
 
-const parsers = {
+// "seven" -> "7" so typed and spoken numbers look the same
+function wordsToDigits(t) {
+  return t.toLowerCase().replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g, (w) => NUMBER_WORDS[w]);
+}
+
+const validators = {
   movie(t) {
-    t = t.toLowerCase();
-    const m = MOVIES.find((x) => t.includes(x.title.toLowerCase().split(":")[0]));
-    return m ? m.title : null;
+    const lower = t.toLowerCase();
+    const m = MOVIES.find((x) => lower.includes(x.title.toLowerCase().split(":")[0]));
+    if (m) return { ok: true, value: m.title };
+    return { ok: false, msg: `I don't have that movie. Now showing: ${MOVIES.map((x) => x.title).join(", ")}.` };
   },
+
   showtime(t) {
-    const digits = t.match(/\d{1,2}/);
-    if (!digits) return null;
-    return getMovie().showtimes.find((s) => parseInt(s) === parseInt(digits[0])) || null;
+    const movie = getMovie();
+    const times = movie.showtimes.join(", ");
+    const m = wordsToDigits(t).match(/(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i);
+    if (!m) return { ok: false, msg: `Please choose a showtime for ${movie.title}: ${times}.` };
+
+    const hour = parseInt(m[1]);
+    const min = m[2];
+    const ampm = m[3] ? (m[3][0].toLowerCase() === "p" ? "PM" : "AM") : null;
+
+    const match = movie.showtimes.find((s) => {
+      const [, h, mm, ap] = s.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
+      return parseInt(h) === hour && (!min || mm === min) && (!ampm || ap === ampm);
+    });
+    if (match) return { ok: true, value: match };
+
+    const asked = `${hour}${min ? ":" + min : ""}${ampm ? " " + ampm : ""}`;
+    return { ok: false, msg: `${movie.title} isn't showing at ${asked}. Available times: ${times}.` };
   },
+
   tickets(t) {
-    const word = Object.keys(NUMBER_WORDS).find((w) => t.toLowerCase().includes(w));
-    const n = word ? NUMBER_WORDS[word] : parseInt(t.match(/\d+/)?.[0]);
-    return n >= 1 && n <= MAX_TICKETS ? n : null;
+    const m = wordsToDigits(t).match(/\d+/);
+    if (!m) return { ok: false, msg: "Please tell me how many tickets you need, for example 2." };
+    const n = parseInt(m[0]);
+    if (n < 1 || n > MAX_TICKETS) return { ok: false, msg: `I can book 1 to ${MAX_TICKETS} tickets at once.` };
+    return { ok: true, value: n };
   },
+
   name(t) {
     const cleaned = t.replace(/^(my name is|it's|it is|i'm|i am|this is|under)\s+/i, "").trim();
-    return cleaned.length >= 1 && cleaned.length <= 40 && /[a-z]/i.test(cleaned) ? cleaned : null;
+    if (!/[a-z]/i.test(cleaned) || /\d/.test(cleaned) || cleaned.length > 40) {
+      return { ok: false, msg: "Please enter a name using letters, up to 40 characters." };
+    }
+    return { ok: true, value: cleaned };
   },
 };
 
@@ -178,6 +209,7 @@ function handleSeatsInput(text) {
 // ---- Entry points ----
 function startConversation() {
   SLOTS.forEach((s) => (booking[s] = null));
+  failCount = 0;
   seatMap = null;
   ask("movie", "Hi! I can help you book movie tickets.");
 }
@@ -196,12 +228,16 @@ function handleUserInput(text, source) {
     return;
   }
 
-  const value = parsers[currentSlot](text);
-  if (value === null) {
-    ask(currentSlot, "Sorry, I didn't catch that.");
+  const result = validators[currentSlot](text);
+  if (!result.ok) {
+    failCount++;
+    setAvatarState("error");
+    const hint = failCount >= 2 ? " You can also tap one of the buttons." : "";
+    ask(currentSlot, result.msg + hint);
     return;
   }
-  booking[currentSlot] = value;
+  failCount = 0;
+  booking[currentSlot] = result.value;
   askNext();
 }
 
