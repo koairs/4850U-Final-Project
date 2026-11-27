@@ -1,7 +1,7 @@
 // OWNER: Kaira
-const booking = { movie: null, showtime: null, tickets: null, seats: null, name: null };
-const SLOTS = ["movie", "showtime", "tickets", "seats", "name"];
-const SLOT_LABELS = { movie: "Movie", showtime: "Showtime", tickets: "Tickets", seats: "Seats", name: "Name" };
+const booking = { movie: null, date: null, showtime: null, tickets: null, seats: null, name: null };
+const SLOTS = ["movie", "date", "showtime", "tickets", "seats", "name"];
+const SLOT_LABELS = { movie: "Movie", date: "Date", showtime: "Showtime", tickets: "Tickets", seats: "Seats", name: "Name" };
 const AREA_REPLIES = ["Front", "Middle", "Back"];
 // currentSlot is a slot name, or "confirm", "change", "done"
 let currentSlot = null;
@@ -25,6 +25,77 @@ const NUMBER_WORDS = {
 // "seven" -> "7" so typed and spoken numbers look the same
 function wordsToDigits(t) {
   return t.toLowerCase().replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g, (w) => NUMBER_WORDS[w]);
+}
+
+const MONTHS = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+  apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7,
+  aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10,
+  october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+const MONTH_PATTERN = Object.keys(MONTHS).sort((a, b) => b.length - a.length).join("|");
+
+function parseBookingDate(text) {
+  const input = text.toLowerCase().replace(/(\d)(st|nd|rd|th)\b/gi, "$1");
+  let year;
+  let month;
+  let day;
+  let match;
+
+  if (/\b(today|tonight)\b/.test(input)) {
+    const now = new Date();
+    year = now.getFullYear();
+    month = now.getMonth() + 1;
+    day = now.getDate();
+  } else if (/\btomorrow\b/.test(input)) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    year = tomorrow.getFullYear();
+    month = tomorrow.getMonth() + 1;
+    day = tomorrow.getDate();
+  } else if ((match = input.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/))) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+  } else if ((match = input.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}))?\b/))) {
+    month = Number(match[1]);
+    day = Number(match[2]);
+    year = match[3] ? Number(match[3]) : new Date().getFullYear();
+  } else if ((match = input.match(new RegExp(`\\b(${MONTH_PATTERN})\\.?\\s+(\\d{1,2})(?:,?\\s+(\\d{4}))?\\b`)))) {
+    month = MONTHS[match[1]];
+    day = Number(match[2]);
+    year = match[3] ? Number(match[3]) : new Date().getFullYear();
+  } else if ((match = input.match(new RegExp(`\\b(\\d{1,2})\\s+(?:of\\s+)?(${MONTH_PATTERN})(?:,?\\s+(\\d{4}))?\\b`)))) {
+    day = Number(match[1]);
+    month = MONTHS[match[2]];
+    year = match[3] ? Number(match[3]) : new Date().getFullYear();
+  } else {
+    return { matched: false };
+  }
+
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return { matched: true, error: "That isn't a valid calendar date. Please try again." };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (date < today) return { matched: true, error: "That date has already passed. Please choose today or a future date." };
+
+  return {
+    matched: true,
+    value: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
+}
+
+function bookingDateLabel(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 const validators = {
@@ -53,6 +124,13 @@ const validators = {
 
     const asked = `${hour}${min ? ":" + min : ""}${ampm ? " " + ampm : ""}`;
     return { ok: false, msg: `${movie.title} isn't showing at ${asked}. Available times: ${times}.` };
+  },
+
+  date(t) {
+    const result = parseBookingDate(t);
+    if (!result.matched) return { ok: false, msg: "Please give a date, such as November 28 or 11/28/2026." };
+    if (result.error) return { ok: false, msg: result.error };
+    return { ok: true, value: result.value };
   },
 
   tickets(t) {
@@ -85,6 +163,12 @@ function extractAll(text, slot) {
     if (mv.ok) found.movie = mv.value;
   }
 
+  const parsedDate = parseBookingDate(text);
+  if (parsedDate.matched) {
+    const result = validators.date(text);
+    if (result.ok) found.date = result.value; else errors.push(result.msg);
+  }
+
   const tk = t.match(/(\d+)\s*(?:tickets?|seats?|people|persons?|adults?)/i) || t.match(/tickets?\s+for\s+(\d+)\b/i);
   if (tk) {
     const r = validators.tickets(tk[1]);
@@ -113,6 +197,7 @@ function extractAll(text, slot) {
 
 function applyFound(found) {
   if (found.movie && found.movie !== booking.movie) { booking.movie = found.movie; booking.showtime = null; }
+  if (found.date) booking.date = found.date;
   if (found.showtime) booking.showtime = found.showtime;
   if (found.tickets) {
     if (found.tickets !== booking.tickets) booking.seats = null; // old seats no longer fit
@@ -124,6 +209,7 @@ function applyFound(found) {
 function describeFound(found) {
   const parts = [];
   if (found.movie) parts.push(found.movie);
+  if (found.date) parts.push(bookingDateLabel(found.date));
   if (found.showtime) parts.push(found.showtime);
   if (found.tickets) parts.push(`${found.tickets} ticket${found.tickets > 1 ? "s" : ""}`);
   if (found.name) parts.push(`booking under ${found.name}`);
@@ -138,8 +224,10 @@ function ask(slot, prefix = "") {
 
   if (slot === "movie") {
     say(p + "Which movie would you like to see?", MOVIES.map((m) => m.title));
+  } else if (slot === "date") {
+    say(p + "What date would you like to see it? You can say a date like November 28, or choose today or tomorrow.", ["Today", "Tomorrow"]);
   } else if (slot === "showtime") {
-    say(p + `What time would you like to see ${booking.movie}?`, getMovie().showtimes);
+    say(p + `What time would you like to see ${booking.movie} on ${bookingDateLabel(booking.date)}?`, getMovie().showtimes);
   } else if (slot === "tickets") {
     say(p + "How many tickets do you need?", ["1", "2", "3", "4"]);
   } else if (slot === "seats") {
@@ -164,6 +252,7 @@ function askNext(prefix = "") {
 function summaryText() {
   return `Please check your booking:\n` +
     `Movie: ${booking.movie}\n` +
+    `Date: ${bookingDateLabel(booking.date)}\n` +
     `Showtime: ${booking.showtime}\n` +
     `Tickets: ${booking.tickets}\n` +
     `Seats: ${booking.seats.join(", ")}\n` +
@@ -194,6 +283,7 @@ function changeSlot(slot, prefix) {
 function findSlotMention(text) {
   const t = text.toLowerCase();
   if (/movie|film/.test(t)) return "movie";
+  if (/\b(date|day)\b/.test(t)) return "date";
   if (/time|show/.test(t)) return "showtime";
   if (/ticket|how many/.test(t)) return "tickets";
   if (/seat/.test(t)) return "seats";
@@ -225,7 +315,7 @@ function finishBooking() {
   setProgress(SLOTS.length, SLOTS.length, "Done");
   setAvatarState("idle");
   showSummary(booking);
-  say(`Your booking is confirmed, ${booking.name}! ${booking.tickets} ticket(s) for ${booking.movie} at ${booking.showtime}, seats ${booking.seats.join(", ")}. Your booking code is ${code}. Enjoy the movie!`, ["Book another"]);
+  say(`Your booking is confirmed, ${booking.name}! ${booking.tickets} ticket(s) for ${booking.movie} on ${bookingDateLabel(booking.date)} at ${booking.showtime}, seats ${booking.seats.join(", ")}. Your booking code is ${code}. Enjoy the movie!`, ["Book another"]);
 }
 
 // ---- Seat input (typed or spoken) ----
@@ -271,6 +361,7 @@ function lockSeatMap() {
 
 function currentReplies() {
   if (currentSlot === "movie") return MOVIES.map((m) => m.title);
+  if (currentSlot === "date") return ["Today", "Tomorrow"];
   if (currentSlot === "showtime") return getMovie() ? getMovie().showtimes : [];
   if (currentSlot === "tickets") return ["1", "2", "3", "4"];
   if (currentSlot === "seats") return AREA_REPLIES;
@@ -344,7 +435,7 @@ function startConversation() {
   SLOTS.forEach((s) => (booking[s] = null));
   seatMap = null;
   failCount = 0;
-  ask("movie", `Hi! I can help you book movie tickets. You can say everything at once, like "2 tickets for Dune at 7".`);
+  ask("movie", `Hi! I can help you book movie tickets. You can say everything at once, like "2 tickets for Dune on November 28 at 7".`);
 }
 
 function handleUserInput(text, source) {
