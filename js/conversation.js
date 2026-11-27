@@ -34,8 +34,8 @@ const validators = {
     return { ok: false, msg: `I don't have that movie. Now showing: ${MOVIES.map((x) => x.title).join(", ")}.` };
   },
 
-  showtime(t) {
-    const movie = getMovie();
+  showtime(t, movieTitle) {
+    const movie = MOVIES.find((x) => x.title === (movieTitle || booking.movie));
     const times = movie.showtimes.join(", ");
     const m = wordsToDigits(t).match(/(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?/i);
     if (!m) return { ok: false, msg: `Please choose a showtime for ${movie.title}: ${times}.` };
@@ -70,6 +70,67 @@ const validators = {
     return { ok: true, value: cleaned };
   },
 };
+// ---- Step 5: pull several answers out of one message ----
+const NAME_STOP_WORDS = /\b(for|at|and|to|with|please|tonight|tomorrow|today)\b.*$/i;
+
+function extractAll(text, slot) {
+  const found = {};
+  const errors = [];
+  const t = wordsToDigits(text);
+
+  // movie (skipped while asking for a name, so a name like "Dune" isn't read as a movie)
+  if (slot !== "name") {
+    const mv = validators.movie(text);
+    if (mv.ok) found.movie = mv.value;
+  }
+
+  // tickets: "2 tickets", "3 people", "tickets for 4"
+  const tk = t.match(/(\d+)\s*(?:tickets?|seats?|people|persons?|adults?)/i) || t.match(/tickets?\s+for\s+(\d+)\b/i);
+  if (tk) {
+    const r = validators.tickets(tk[1]);
+    if (r.ok) found.tickets = r.value; else errors.push(r.msg);
+  }
+
+  // showtime: needs a movie, either already chosen or found in this message
+  const movieTitle = found.movie || booking.movie;
+  if (slot !== "name" && movieTitle) {
+    const st = t.match(/\bat\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?)/i)
+            || t.match(/\b(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?))/i)
+            || t.match(/\b(\d{1,2}:\d{2})\b/);
+    if (st) {
+      const r = validators.showtime(st[1], movieTitle);
+      if (r.ok) found.showtime = r.value; else errors.push(r.msg);
+    }
+  }
+
+  // name: "my name is Sam", "under Sam"
+  const nm = text.match(/(?:my name is|name is|under(?: the name)?)\s+([a-z][a-z'’ -]*)/i);
+  if (nm) {
+    const r = validators.name(nm[1].replace(NAME_STOP_WORDS, "").trim());
+    if (r.ok) found.name = r.value;
+  }
+
+  return { found, errors };
+}
+
+function applyFound(found) {
+  if (found.movie && found.movie !== booking.movie) { booking.movie = found.movie; booking.showtime = null; }
+  if (found.showtime) booking.showtime = found.showtime;
+  if (found.tickets) {
+    if (found.tickets !== booking.tickets) booking.seats = null; // old seats no longer fit
+    booking.tickets = found.tickets;
+  }
+  if (found.name) booking.name = found.name;
+}
+
+function describeFound(found) {
+  const parts = [];
+  if (found.movie) parts.push(found.movie);
+  if (found.showtime) parts.push(found.showtime);
+  if (found.tickets) parts.push(`${found.tickets} ticket${found.tickets > 1 ? "s" : ""}`);
+  if (found.name) parts.push(`booking under ${found.name}`);
+  return parts.join(", ");
+}
 
 // ---- Questions (prefix = optional sentence said before the question) ----
 function ask(slot, prefix = "") {
@@ -228,17 +289,32 @@ function handleUserInput(text, source) {
     return;
   }
 
-  const result = validators[currentSlot](text);
-  if (!result.ok) {
-    failCount++;
-    setAvatarState("error");
-    const hint = failCount >= 2 ? " You can also tap one of the buttons." : "";
-    ask(currentSlot, result.msg + hint);
+  const { found, errors } = extractAll(text, currentSlot);
+  const keys = Object.keys(found);
+
+  // Nothing recognised in the message: treat it as a plain answer to the current question
+  if (keys.length === 0 && errors.length === 0) {
+    const result = validators[currentSlot](text);
+    if (!result.ok) {
+      failCount++;
+      setAvatarState("error");
+      const hint = failCount >= 2 ? " You can also tap one of the buttons." : "";
+      ask(currentSlot, result.msg + hint);
+      return;
+    }
+    failCount = 0;
+    booking[currentSlot] = result.value;
+    askNext();
     return;
   }
-  failCount = 0;
-  booking[currentSlot] = result.value;
-  askNext();
+
+  // One or more answers found in the message
+  applyFound(found);
+  if (keys.length) failCount = 0; else failCount++;
+  if (errors.length) setAvatarState("error");
+  const ack = keys.length ? `Got it: ${describeFound(found)}.` : "";
+  const hint = failCount >= 2 ? "You can also tap one of the buttons." : "";
+  askNext([ack, ...errors, hint].filter(Boolean).join(" "));
 }
 
 function goBack() { /* TODO Step 6 */ }
