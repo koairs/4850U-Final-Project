@@ -12,9 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   };
 
-  $("btn-restart").onclick = () => { $("messages").innerHTML = ""; startConversation(); };
-  $("btn-back").onclick = () => goBack();
-
+$("btn-restart").onclick = () => restartConversation();
   startConversation();
 });
 

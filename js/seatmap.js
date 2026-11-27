@@ -67,6 +67,7 @@ function renderSeatMap(count, onConfirm) {
   document.getElementById("messages").appendChild(wrap);
   $("messages").scrollTop = $("messages").scrollHeight;
 
+
   return {
     set(ids) {
       selected.clear();
@@ -74,6 +75,11 @@ function renderSeatMap(count, onConfirm) {
       update();
     },
     confirm,
+    lock() {
+      wrap.classList.add("locked");
+      wrap.querySelectorAll(".seat:not(.taken)").forEach((seat) => { seat.disabled = true; });
+      confirmBtn.disabled = true;
+    },
     isFull: () => selected.size === count,
   };
 }

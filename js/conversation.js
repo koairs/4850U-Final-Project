@@ -1,4 +1,4 @@
-// OWNER: Person A
+// OWNER: Kaira
 const booking = { movie: null, showtime: null, tickets: null, seats: null, name: null };
 const SLOTS = ["movie", "showtime", "tickets", "seats", "name"];
 const SLOT_LABELS = { movie: "Movie", showtime: "Showtime", tickets: "Tickets", seats: "Seats", name: "Name" };
@@ -6,6 +6,7 @@ const AREA_REPLIES = ["Front", "Middle", "Back"];
 // currentSlot is a slot name, or "confirm", "change", "done"
 let currentSlot = null;
 let seatMap = null;
+let failCount = 0; // consecutive invalid answers for the current question
 
 function say(text, quickReplies = []) {
   addMessage("avatar", text, quickReplies);
@@ -70,6 +71,7 @@ const validators = {
     return { ok: true, value: cleaned };
   },
 };
+
 // ---- Step 5: pull several answers out of one message ----
 const NAME_STOP_WORDS = /\b(for|at|and|to|with|please|tonight|tomorrow|today)\b.*$/i;
 
@@ -78,20 +80,17 @@ function extractAll(text, slot) {
   const errors = [];
   const t = wordsToDigits(text);
 
-  // movie (skipped while asking for a name, so a name like "Dune" isn't read as a movie)
   if (slot !== "name") {
     const mv = validators.movie(text);
     if (mv.ok) found.movie = mv.value;
   }
 
-  // tickets: "2 tickets", "3 people", "tickets for 4"
   const tk = t.match(/(\d+)\s*(?:tickets?|seats?|people|persons?|adults?)/i) || t.match(/tickets?\s+for\s+(\d+)\b/i);
   if (tk) {
     const r = validators.tickets(tk[1]);
     if (r.ok) found.tickets = r.value; else errors.push(r.msg);
   }
 
-  // showtime: needs a movie, either already chosen or found in this message
   const movieTitle = found.movie || booking.movie;
   if (slot !== "name" && movieTitle) {
     const st = t.match(/\bat\s+(\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?)/i)
@@ -103,7 +102,6 @@ function extractAll(text, slot) {
     }
   }
 
-  // name: "my name is Sam", "under Sam"
   const nm = text.match(/(?:my name is|name is|under(?: the name)?)\s+([a-z][a-z'’ -]*)/i);
   if (nm) {
     const r = validators.name(nm[1].replace(NAME_STOP_WORDS, "").trim());
@@ -159,7 +157,7 @@ function ask(slot, prefix = "") {
 function askNext(prefix = "") {
   const slot = nextEmptySlot();
   if (slot) { ask(slot, prefix); return; }
-  askConfirm();
+  askConfirm(prefix);
 }
 
 // ---- Step 3: summary, confirmation, changes ----
@@ -173,10 +171,10 @@ function summaryText() {
     `Is everything correct?`;
 }
 
-function askConfirm() {
+function askConfirm(prefix = "") {
   currentSlot = "confirm";
   setProgress(SLOTS.length, SLOTS.length, "Confirm");
-  say(summaryText(), ["Yes, book it", "Change something"]);
+  say((prefix ? prefix + "\n" : "") + summaryText(), ["Yes, book it", "Change something"]);
 }
 
 function askWhatToChange(prefix = "") {
@@ -184,11 +182,12 @@ function askWhatToChange(prefix = "") {
   say((prefix ? prefix + " " : "") + "What would you like to change?", SLOTS.map((s) => SLOT_LABELS[s]));
 }
 
-function changeSlot(slot) {
+function changeSlot(slot, prefix) {
+  lockSeatMap();
   booking[slot] = null;
   if (slot === "movie") booking.showtime = null;  // showtimes depend on the movie
   if (slot === "tickets") booking.seats = null;   // seats depend on the ticket count
-  askNext(`Okay, let's update the ${SLOT_LABELS[slot].toLowerCase()}.`);
+  askNext(prefix || `Okay, let's update the ${SLOT_LABELS[slot].toLowerCase()}.`);
 }
 
 // Which slot is the user talking about? ("change the seats", "Name", ...)
@@ -232,13 +231,11 @@ function finishBooking() {
 function handleSeatsInput(text) {
   const lower = text.toLowerCase();
 
-  // "yes" / "confirm" locks in whatever is highlighted
   if (/^(yes|yeah|yep|confirm|ok|okay|use these seats)\b/.test(lower)) {
     if (!seatMap.confirm()) say(`Please choose ${booking.tickets} seat(s) first.`, AREA_REPLIES);
     return;
   }
 
-  // Area: highlight a suggestion, let the user confirm or change it
   const area = Object.keys(AREA_ROWS).find((a) => lower.includes(a));
   if (area) {
     const ids = suggestSeats(area, booking.tickets);
@@ -248,7 +245,6 @@ function handleSeatsInput(text) {
     return;
   }
 
-  // Specific seats: "C4 and C5"
   const ids = parseSeats(text);
   if (ids.length === 0) {
     say(`Sorry, I didn't catch that. Tap seats on the map, choose an area, or say seats like "C4 and C5".`, AREA_REPLIES);
@@ -267,12 +263,87 @@ function handleSeatsInput(text) {
   say(`I've selected ${ids.join(", ")}. Say "yes" or press "Use these seats" to confirm.`, AREA_REPLIES);
 }
 
+// ---- Step 6: corrections, back, restart ----
+function lockSeatMap() {
+  if (seatMap) { seatMap.lock(); seatMap = null; }
+}
+
+function currentReplies() {
+  if (currentSlot === "movie") return MOVIES.map((m) => m.title);
+  if (currentSlot === "showtime") return getMovie() ? getMovie().showtimes : [];
+  if (currentSlot === "tickets") return ["1", "2", "3", "4"];
+  if (currentSlot === "seats") return AREA_REPLIES;
+  if (currentSlot === "confirm") return ["Yes, book it", "Change something"];
+  if (currentSlot === "change") return SLOTS.map((s) => SLOT_LABELS[s]);
+  return [];
+}
+
+function goBack() {
+  if (currentSlot === "done") {
+    say(`Your booking is complete. Press "Book another" to start a new one.`, ["Book another"]);
+    return;
+  }
+  const last = [...SLOTS].reverse().find((s) => booking[s]);
+  if (!last) { say("We're already at the first question.", currentReplies()); return; }
+  changeSlot(last, "Going back.");
+}
+
+function restartConversation() {
+  lockSeatMap();
+  $("messages").innerHTML = "";
+  startConversation();
+}
+
+const CORRECTION_CUE = /\b(actually|instead|change|changed my mind|make it|make that|switch|update|i meant|i mean|wait)\b/i;
+
+// Returns true if the message was a correction (and has been handled)
+function tryCorrection(text) {
+  if (!CORRECTION_CUE.test(text)) return false;
+
+  const { found, errors } = extractAll(text, currentSlot);
+
+  if (!Object.keys(found).length && !errors.length) {
+    let slot = findSlotMention(text);
+    if (!slot && /\bmake (it|that)\b/i.test(text) && (booking.tickets || currentSlot === "tickets")) slot = "tickets";
+    if (!slot) return false;
+
+    if (slot === "seats") {
+      if (currentSlot === "seats" || !booking.seats) return false;
+      changeSlot("seats");
+      return true;
+    }
+    if (!booking[slot] && currentSlot !== slot) return false;
+    if (slot === "showtime" && !booking.movie) return false;
+
+    const to = text.match(/\b(?:to|as|be|is)\s+(.+)$/i);
+    let r = null;
+    if (to) r = validators[slot](to[1]);
+    else if (slot === "tickets" && /\d|\b(one|two|three|four|five|six|seven|eight)\b/i.test(text)) r = validators.tickets(text);
+
+    if (!r) { changeSlot(slot); return true; }
+    if (r.ok) found[slot] = r.value; else errors.push(r.msg);
+  }
+
+  if (!Object.keys(found).length) {
+    say(errors.join(" ") + " Your booking hasn't changed.", currentReplies());
+    return true;
+  }
+
+  const hadSeats = !!booking.seats;
+  lockSeatMap();
+  applyFound(found);
+  const notes = [`Updated: ${describeFound(found)}.`];
+  if (hadSeats && !booking.seats) notes.push("Your seats were cleared, so please choose them again.");
+  askNext([...notes, ...errors].join(" "));
+  return true;
+}
+
 // ---- Entry points ----
 function startConversation() {
   SLOTS.forEach((s) => (booking[s] = null));
-  failCount = 0;
   seatMap = null;
-  ask("movie", "Hi! I can help you book movie tickets.");
+  failCount = 0;
+  ask("movie", `Hi! I can help you book movie tickets. You can say everything at once, like "2 tickets for Dune at 7".`);
 }
 
 function handleUserInput(text, source) {
@@ -280,11 +351,17 @@ function handleUserInput(text, source) {
   setAvatarState("thinking");
   setStatus("Thinking…");
 
+  const trimmed = text.trim();
+  // "Back" alone is also an area button while choosing seats, so only treat it as "go back" elsewhere
+  if (/^(go back|previous|undo)\b/i.test(trimmed) || (/^back[.!]?$/i.test(trimmed) && currentSlot !== "seats")) { goBack(); return; }
+  if (/^(start over|restart|begin again|reset)[.!]?$/i.test(trimmed)) { restartConversation(); return; }
+  if (currentSlot !== "done" && tryCorrection(text)) return;
+
   if (currentSlot === "seats") { handleSeatsInput(text); return; }
   if (currentSlot === "confirm") { handleConfirm(text); return; }
   if (currentSlot === "change") { handleChange(text); return; }
   if (currentSlot === "done") {
-    if (/another|again|new/i.test(text)) { $("messages").innerHTML = ""; startConversation(); }
+    if (/another|again|new/i.test(text)) restartConversation();
     else say("Your booking is complete. Press \"Book another\" to start a new one.", ["Book another"]);
     return;
   }
@@ -292,7 +369,6 @@ function handleUserInput(text, source) {
   const { found, errors } = extractAll(text, currentSlot);
   const keys = Object.keys(found);
 
-  // Nothing recognised in the message: treat it as a plain answer to the current question
   if (keys.length === 0 && errors.length === 0) {
     const result = validators[currentSlot](text);
     if (!result.ok) {
@@ -308,7 +384,6 @@ function handleUserInput(text, source) {
     return;
   }
 
-  // One or more answers found in the message
   applyFound(found);
   if (keys.length) failCount = 0; else failCount++;
   if (errors.length) setAvatarState("error");
@@ -316,5 +391,3 @@ function handleUserInput(text, source) {
   const hint = failCount >= 2 ? "You can also tap one of the buttons." : "";
   askNext([ack, ...errors, hint].filter(Boolean).join(" "));
 }
-
-function goBack() { /* TODO Step 6 */ }
