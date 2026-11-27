@@ -30,8 +30,31 @@ function setStatus(text) { $("status").textContent = text; }
 function showHeard(text) {
   const el = $("heard");
   el.hidden = !text;
-  el.textContent = text ? `I heard: "${text}"` : "";
-  // TODO (B): add "Retry" button next to heard text
+  el.replaceChildren();
+
+  if (!text) return;
+
+  const heardText = document.createElement("span");
+  heardText.textContent = `I heard: "${text}"`;
+  const retry = document.createElement("button");
+  retry.type = "button";
+  retry.className = "heard-retry";
+  retry.textContent = "Retry";
+  retry.onclick = () => {
+    startListening(
+      (result) => { showHeard(result); handleUserInput(result, "voice"); },
+      (code) => {
+        setAvatarState("error");
+        const message = code === "no-speech"
+          ? "I didn't hear anything. You can try again or type your answer."
+          : "Sorry, I couldn't hear that. You can try again or type your answer.";
+        addMessage("avatar", message);
+        setStatus("Ready");
+      }
+    );
+  };
+
+  el.append(heardText, retry);
 }
 
 function setProgress(step, total, label) {
@@ -39,6 +62,33 @@ function setProgress(step, total, label) {
 }
 
 function showSummary(booking) {
-  // TODO (B): styled confirmation card (movie, time, tickets, seats, name)
-  console.log("SUMMARY", booking);
+  const card = document.createElement("section");
+  card.className = "booking-summary";
+  card.setAttribute("aria-label", "Booking summary");
+
+  const title = document.createElement("h3");
+  title.textContent = "Your booking";
+
+  const rows = [
+    ["Movie", booking.movie],
+    ["Showtime", booking.showtime],
+    ["Tickets", booking.tickets],
+    ["Seats", booking.seats ? booking.seats.join(", ") : ""],
+    ["Name", booking.name],
+  ];
+
+  card.appendChild(title);
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "summary-row";
+    const key = document.createElement("span");
+    key.textContent = label;
+    const val = document.createElement("strong");
+    val.textContent = value;
+    row.append(key, val);
+    card.appendChild(row);
+  });
+
+  $("messages").appendChild(card);
+  $("messages").scrollTop = $("messages").scrollHeight;
 }

@@ -7,9 +7,25 @@ document.addEventListener("DOMContentLoaded", () => {
   $("text-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendText(); });
 
   $("btn-mic").onclick = () => {
+    stopSpeaking();
+
+    if ($("btn-mic").getAttribute("aria-pressed") === "true") {
+      stopListening();
+      setStatus("Ready");
+      setAvatarState("idle");
+      return;
+    }
+
     startListening(
       (text) => { showHeard(text); handleUserInput(text, "voice"); },
-      () => { addMessage("avatar", "Sorry, I couldn't hear that. You can try again or type your answer."); setStatus("Ready"); }
+      (code) => {
+        setAvatarState("error");
+        const message = code === "no-speech"
+          ? "I didn't hear anything. You can try again or type your answer."
+          : "Sorry, I couldn't hear that. You can try again or type your answer.";
+        addMessage("avatar", message);
+        setStatus("Ready");
+      }
     );
   };
 

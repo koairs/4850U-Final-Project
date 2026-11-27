@@ -79,6 +79,21 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .msg.avatar { align-self: flex-start; border: 1px solid #e9e1d9; border-bottom-left-radius: 4px; background: #f5f0e9; color: var(--ink); }
 .msg.user { background: var(--curtain); color: #fff; align-self: flex-end; }
 .heard { font-size: .9rem; color: var(--muted); }
+.heard { display: flex; align-items: center; gap: 8px; }
+.heard[hidden] { display: none; }
+.heard-retry { border: 1px solid var(--curtain); border-radius: 999px; background: #fff; color: var(--curtain); padding: 4px 10px; cursor: pointer; }
+.booking-summary {
+  width: min(420px, 100%);
+  align-self: flex-end;
+  border: 1px solid #d8cfc6;
+  border-left: 4px solid var(--amber);
+  border-radius: 12px;
+  background: #fffaf3;
+  padding: 12px 14px;
+}
+.booking-summary h3 { margin: 0 0 8px; }
+.summary-row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; padding: 4px 0; }
+.summary-row span { color: var(--muted); }
 .quick-replies { display: flex; flex-wrap: wrap; gap: 8px; }
 .quick-replies button { border: 2px solid var(--curtain); background: #fff; color: var(--curtain); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .controls { display: flex; gap: 8px; }

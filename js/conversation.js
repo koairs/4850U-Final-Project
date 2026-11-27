@@ -224,6 +224,7 @@ function finishBooking() {
   const code = "RA-" + Math.random().toString(36).slice(2, 7).toUpperCase();
   setProgress(SLOTS.length, SLOTS.length, "Done");
   setAvatarState("idle");
+  showSummary(booking);
   say(`Your booking is confirmed, ${booking.name}! ${booking.tickets} ticket(s) for ${booking.movie} at ${booking.showtime}, seats ${booking.seats.join(", ")}. Your booking code is ${code}. Enjoy the movie!`, ["Book another"]);
 }
 
