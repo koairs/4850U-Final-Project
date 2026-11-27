@@ -2,6 +2,11 @@
 
 Run: `python3 -m http.server 8000` then open http://localhost:8000 in **Chrome/Edge** (needed for voice).
 
+## Avatar preview (Person C)
+Open http://localhost:8000/avatar-preview.html to switch between all five avatar states without using the microphone or booking flow. The checkbox previews the static expressions; the system's reduced-motion preference is also respected.
+
+The SVG cinema robot uses CSS animations with no additional libraries. `initAvatar()` renders it inside `#avatar`; `setAvatarState("idle"|"listening"|"thinking"|"speaking"|"error")` updates its expression and accessible label. Invalid states are ignored. The conversation and voice modules remain responsible for state transitions and the visible status text. Speaking animates the mouth as an activity indicator, not lip synchronization.
+
 ## Ownership
 | File | Owner |
 |---|---|
