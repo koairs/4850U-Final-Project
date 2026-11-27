@@ -10,12 +10,27 @@
   <main class="app">
     <!-- OWNER: Person C (avatar) -->
     <section class="avatar-panel" aria-label="Assistant">
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <div>
+          <p class="eyebrow">YOUR MOVIE CONCIERGE</p>
+          <h1>Reel Assistant</h1>
+        </div>
+      </div>
       <div id="avatar" data-state="idle"></div>
       <p id="status" role="status" aria-live="polite">Ready</p>
+      <p class="assistant-caption">Your next great night starts here.</p>
     </section>
 
     <!-- OWNER: Person B (UI/voice) -->
     <section class="chat-panel" aria-label="Conversation">
+      <header class="conversation-heading">
+        <div>
+          <p class="eyebrow">MOVIE NIGHT, MADE EASY</p>
+          <h2>Let’s book your seats</h2>
+        </div>
+        <span class="cinema-badge" aria-hidden="true">✦</span>
+      </header>
       <div id="progress" class="progress" aria-label="Booking progress"></div>
       <div id="messages" class="messages" aria-live="polite"></div>
       <div id="heard" class="heard" hidden></div>
@@ -36,9 +51,9 @@
   </main>
 
   <!-- Load order matters -->
-  <script src="data/movies.js"></script>
-  <script src="js/avatar.js"></script>
+  <script src="data/movies.js?v=2"></script>  <script src="js/avatar.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/seatmap.js"></script>
   <script src="js/voice.js"></script>
   <script src="js/conversation.js"></script>
   <script src="js/main.js"></script>

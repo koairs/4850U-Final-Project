@@ -6,3 +6,8 @@ const MOVIES = [
 ];
 const SEAT_AREAS = ["front", "middle", "back", "aisle"];
 const MAX_TICKETS = 8;
+
+const SEAT_ROWS = ["A", "B", "C", "D", "E"];
+const SEATS_PER_ROW = 8;
+const TAKEN_SEATS = ["A2", "A7", "B1", "B6", "C5", "D4", "E3", "E8"];
+const AREA_ROWS = { front: ["A", "B"], middle: ["C", "D"], back: ["E"] };
