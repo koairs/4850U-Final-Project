@@ -1,6 +1,5 @@
 # Reel Assistant – Voice/Text Movie Booking Avatar (SOFE4850)
 
-Run: `python3 -m http.server 8000` then open http://localhost:8000 in **Chrome/Edge** (needed for voice).
 
 ## Avatar preview (Person C)
 Open http://localhost:8000/avatar-preview.html to switch between all five avatar states without using the microphone or booking flow. The checkbox previews the static expressions; the system's reduced-motion preference is also respected.
