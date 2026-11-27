@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reel Assistant – Movie Ticket Booking</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app">
+    <!-- OWNER: Person C (avatar) -->
+    <section class="avatar-panel" aria-label="Assistant">
+      <div id="avatar" data-state="idle"></div>
+      <p id="status" role="status" aria-live="polite">Ready</p>
+    </section>
+
+    <!-- OWNER: Person B (UI/voice) -->
+    <section class="chat-panel" aria-label="Conversation">
+      <div id="progress" class="progress" aria-label="Booking progress"></div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div id="heard" class="heard" hidden></div>
+      <div id="quick-replies" class="quick-replies"></div>
+
+      <div class="controls">
+        <button id="btn-back" type="button">Back</button>
+        <button id="btn-restart" type="button">Restart</button>
+      </div>
+
+      <div class="input-row">
+        <button id="btn-mic" type="button" aria-pressed="false" aria-label="Start speaking">🎤</button>
+        <input id="text-input" type="text" placeholder="Type your answer…" autocomplete="off" aria-label="Type your answer">
+        <button id="btn-send" type="button">Send</button>
+      </div>
+      <p class="privacy">We only collect your name and booking choices. No payment details are stored in this demo.</p>
+    </section>
+  </main>
+
+  <!-- Load order matters -->
+  <script src="data/movies.js"></script>
+  <script src="js/avatar.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/voice.js"></script>
+  <script src="js/conversation.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

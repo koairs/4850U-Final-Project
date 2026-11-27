@@ -1,0 +1,40 @@
+/* OWNER: Person B (layout, theme) / Person C (avatar section) */
+:root {
+  --bg: #f5f2ee;
+  --ink: #1b1b1f;
+  --curtain: #7a1f2b;
+  --amber: #e8a33d;
+  --panel: #ffffff;
+  --muted: #6b6b73;
+  --focus: #1a5fd0;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+.app { display: grid; grid-template-columns: 320px 1fr; gap: 24px; max-width: 1000px; margin: 0 auto; padding: 24px; min-height: 100vh; }
+@media (max-width: 720px) { .app { grid-template-columns: 1fr; } }
+
+button, input { font: inherit; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- Avatar (Person C) ---------- */
+.avatar-panel { text-align: center; }
+#avatar { width: 220px; height: 220px; margin: 0 auto; }
+#status { font-weight: 600; color: var(--curtain); }
+
+/* ---------- Chat (Person B) ---------- */
+.chat-panel { background: var(--panel); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.messages { flex: 1; min-height: 320px; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; line-height: 1.4; }
+.msg.avatar { background: #efe9e2; align-self: flex-start; }
+.msg.user { background: var(--curtain); color: #fff; align-self: flex-end; }
+.heard { font-size: .9rem; color: var(--muted); }
+.quick-replies { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-replies button { border: 2px solid var(--curtain); background: #fff; color: var(--curtain); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.controls { display: flex; gap: 8px; }
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+#btn-mic[aria-pressed="true"] { background: var(--amber); }
+.privacy { font-size: .8rem; color: var(--muted); margin: 0; }
+.progress { font-size: .85rem; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
