@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAvatar();
 
   $("btn-send").onclick = sendText;
+  $("btn-back").onclick = goBack;
   $("text-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendText(); });
 
   $("btn-mic").onclick = () => {
