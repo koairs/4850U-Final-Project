@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reel Assistant — Avatar Preview</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    main { max-width: 640px; margin: 0 auto; padding: 40px 20px; text-align: center; }
+    h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .intro { color: var(--muted); line-height: 1.6; }
+    .preview { background: var(--panel); padding: 28px 16px; border-radius: 20px; margin: 24px 0; }
+    .states { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .states button { cursor: pointer; padding: 9px 14px; border: 2px solid var(--curtain); border-radius: 999px; color: var(--curtain); background: white; }
+    .states button[aria-pressed="true"] { background: var(--curtain); color: white; }
+    label { display: block; margin-top: 24px; }
+    .reduce-motion #avatar *, .reduce-motion #avatar *::before, .reduce-motion #avatar *::after { animation: none !important; transition: none !important; }
+    a { color: var(--curtain); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Meet your Reel Assistant</h1>
+    <p class="intro">Preview each expression independently of the booking and voice features.</p>
+    <section class="preview" aria-label="Avatar preview">
+      <div id="avatar" data-state="idle"></div>
+      <p id="status" role="status" aria-live="polite">Ready</p>
+      <div class="states" role="group" aria-label="Avatar state">
+        <button type="button" data-state="idle" aria-pressed="true">Idle</button>
+        <button type="button" data-state="listening" aria-pressed="false">Listening</button>
+        <button type="button" data-state="thinking" aria-pressed="false">Thinking</button>
+        <button type="button" data-state="speaking" aria-pressed="false">Speaking</button>
+        <button type="button" data-state="error" aria-pressed="false">Error</button>
+      </div>
+      <label><input id="reduce-motion" type="checkbox"> Preview without animation</label>
+    </section>
+    <p class="intro">System reduced-motion preferences are also respected. Speaking uses a simple mouth animation, not lip synchronization.</p>
+    <a href="index.html">Open booking assistant</a>
+  </main>
+  <script src="js/avatar.js"></script>
+  <script>
+    initAvatar();
+    const labels = { idle: "Ready", listening: "Listening…", thinking: "Thinking…", speaking: "Speaking…", error: "Needs attention — try again" };
+    document.querySelectorAll(".states button").forEach((button) => {
+      button.addEventListener("click", () => {
+        setAvatarState(button.dataset.state);
+        document.getElementById("status").textContent = labels[button.dataset.state];
+        document.querySelectorAll(".states button").forEach((item) => {
+          item.setAttribute("aria-pressed", String(item === button));
+        });
+      });
+    });
+    document.getElementById("reduce-motion").addEventListener("change", (event) => {
+      document.body.classList.toggle("reduce-motion", event.target.checked);
+    });
+  </script>
+</body>
+</html>
