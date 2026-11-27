@@ -1,4 +1,4 @@
-# Reel Assistant: Voice & Text Movie Booking Avatar
+# Bob the Ticket Master: Voice & Text Movie Booking Avatar
 
 **SOFE 4850U Final Project.** A browser-based conversational assistant ("Bob the Ticket Master") that books movie tickets through speech or typed text. An animated cinema-robot avatar reacts to the conversation as it listens, thinks, speaks and handles errors.
 
